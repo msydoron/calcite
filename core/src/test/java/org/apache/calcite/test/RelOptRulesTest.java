@@ -112,8 +112,6 @@ import java.util.List;
 
 import static org.junit.Assert.assertTrue;
 
-
-
 /**
  * Unit test for rules in {@code org.apache.calcite.rel} and subpackages.
  *

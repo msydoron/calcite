@@ -2065,3 +2065,82 @@ intervalLiteral:
 
 In *patternQuantifier*, *repeat* is a positive integer,
 and *minRepeat* and *maxRepeat* are non-negative integers.
+
+### Extensions
+
+DDL extensions are only available in the calcite-server module.
+To enable, include `calcite-server.jar` in your class path, and add
+`ParserFactory=org.apache.calcite.sql.parser.ddl.SqlDdlParserImpl#FACTORY`
+to the JDBC connect string.
+
+{% highlight sql %}
+ddlStatement:
+      createSchemaStatement
+  |   createForeignSchemaStatement
+  |   createTableStatement
+  |   createViewStatement
+  |   dropSchemaStatement
+  |   dropTableStatement
+  |   dropViewStatement
+
+createSchemaStatement:
+      CREATE [ OR REPLACE ] SCHEMA [ IF NOT EXISTS ] name
+
+createForeignSchemaStatement:
+      CREATE [ OR REPLACE ] FOREIGN SCHEMA [ IF NOT EXISTS ] name
+      (
+          TYPE 'type'
+      |   LIBRARY 'com.example.calcite.ExampleSchemaFactory'
+      )
+      [ OPTIONS '(' option [, option ]* ')' ]
+
+option:
+      name literal
+
+createTableStatement:
+      CREATE TABLE [ IF NOT EXISTS ] name
+      [ '(' tableElement [, tableElement ]* ')' ]
+      [ AS query ]
+
+tableElement:
+      column type [ columnGenerator ] [ columnConstraint ]
+  |   columnName
+  |   tableConstraint
+
+columnGenerator:
+      DEFAULT expression
+  |   [ GENERATED ALWAYS ] AS '(' expression ')'
+      { VIRTUAL | STORED }
+
+columnConstraint:
+      [ CONSTRAINT name ]
+      [ NOT ] NULL
+
+tableConstraint:
+      [ CONSTRAINT name ]
+      {
+          CHECK '(' expression ')'
+      |   PRIMARY KEY '(' column [, column ]* ')'
+      |   UNIQUE '(' column [, column ]* ')'
+      }
+
+createViewStatement:
+      CREATE [ OR REPLACE ] [ MATERIALIZED ] VIEW name
+      [ '(' column [, column ]* ')' ]
+      AS query
+
+dropSchemaStatement:
+      DROP SCHEMA name [ IF EXISTS ]
+
+dropTableStatement:
+      DROP TABLE name [ IF EXISTS ]
+
+dropViewStatement:
+      DROP [ MATERIALIZED ] VIEW name [ IF EXISTS ]
+{% endhighlight %}
+
+In *createTableStatement*, if you specify *AS query*, you may omit the list of
+columns, or you may specify column names without data types.
+
+In *columnGenerator*, if you do not specify `VIRTUAL` or `STORED` for a
+generated column, `VIRTUAL` is the default.

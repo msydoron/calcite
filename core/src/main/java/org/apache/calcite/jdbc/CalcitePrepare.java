@@ -109,7 +109,14 @@ public interface CalcitePrepare {
   interface Context {
     JavaTypeFactory getTypeFactory();
 
+    /** Returns the root schema for statements that need a read-consistent
+     * snapshot. */
     CalciteSchema getRootSchema();
+
+    /** Returns the root schema for statements that need to be able to modify
+     * schemas and have the results available to other statements. Viz, DDL
+     * statements. */
+    CalciteSchema getMutableRootSchema();
 
     List<String> getDefaultSchemaPath();
 

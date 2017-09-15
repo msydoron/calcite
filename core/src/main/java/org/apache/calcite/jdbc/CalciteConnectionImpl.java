@@ -465,13 +465,15 @@ abstract class CalciteConnectionImpl
   /** Implementation of Context. */
   static class ContextImpl implements CalcitePrepare.Context {
     private final CalciteConnectionImpl connection;
+    private final CalciteSchema mutableRootSchema;
     private final CalciteSchema rootSchema;
 
     ContextImpl(CalciteConnectionImpl connection) {
       this.connection = Preconditions.checkNotNull(connection);
       long now = System.currentTimeMillis();
       SchemaVersion schemaVersion = new LongSchemaVersion(now);
-      this.rootSchema = connection.rootSchema.createSnapshot(schemaVersion);
+      this.mutableRootSchema = connection.rootSchema;
+      this.rootSchema = mutableRootSchema.createSnapshot(schemaVersion);
     }
 
     public JavaTypeFactory getTypeFactory() {
@@ -480,6 +482,10 @@ abstract class CalciteConnectionImpl
 
     public CalciteSchema getRootSchema() {
       return rootSchema;
+    }
+
+    public CalciteSchema getMutableRootSchema() {
+      return mutableRootSchema;
     }
 
     public List<String> getDefaultSchemaPath() {

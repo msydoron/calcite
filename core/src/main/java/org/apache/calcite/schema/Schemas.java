@@ -407,6 +407,10 @@ public final class Schemas {
         return schema.root();
       }
 
+      public CalciteSchema getMutableRootSchema() {
+        return getRootSchema();
+      }
+
       public List<String> getDefaultSchemaPath() {
         // schemaPath is usually null. If specified, it overrides schema
         // as the context within which the SQL is validated.
