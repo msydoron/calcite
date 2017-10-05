@@ -107,7 +107,7 @@ public interface SaffronProperties {
    * <p>If the value is less than 0, there is no limit. The default is 1,000.
    */
   @Resource("saffron.metadata.handler.cache.maximum.size")
-  @Default("1000000")
+  @Default("1000")
   IntProp metadataHandlerCacheMaximumSize();
 
   SaffronProperties INSTANCE = Helper.instance();
