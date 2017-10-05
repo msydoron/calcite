@@ -2014,9 +2014,12 @@ public class RelToSqlConverterTest {
   @Test public void testValues() {
     final String sql = "select \"a\"\n"
         + "from (values (1, 'x'), (2, 'yy')) as t(\"a\", \"b\")";
-    final String expectedHsqldb = "SELECT \"A\"\n"
+    final String expectedHsqldb = "SELECT a\n"
         + "FROM (VALUES  (1, 'x '),\n"
-        + " (2, 'yy')) AS T(\"a\", \"b\")";
+        + " (2, 'yy')) AS t (a, b)";
+    final String expectedPostgresql = "SELECT \"a\"\n"
+        + "FROM (VALUES  (1, 'x '),\n"
+        + " (2, 'yy')) AS \"t\" (\"a\", \"b\")";
     final String expectedOracle = "select \"A\" from (\n"
         + "    select 1 as \"A\", 'x' as \"B\" from dual\n"
         + "    union all\n"
@@ -2024,6 +2027,8 @@ public class RelToSqlConverterTest {
     sql(sql)
         .withHsqldb()
         .ok(expectedHsqldb)
+        .withPostgresql()
+        .ok(expectedPostgresql)
         .withOracle()
         .ok(expectedOracle);
   }

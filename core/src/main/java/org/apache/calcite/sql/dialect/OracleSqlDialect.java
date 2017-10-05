@@ -19,12 +19,22 @@ package org.apache.calcite.sql.dialect;
 import org.apache.calcite.avatica.util.TimeUnitRange;
 import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlDialect;
+import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlLiteral;
+import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlNodeList;
+import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.SqlUtil;
 import org.apache.calcite.sql.SqlWriter;
 import org.apache.calcite.sql.fun.OracleSqlOperatorTable;
 import org.apache.calcite.sql.fun.SqlFloorFunction;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
+import org.apache.calcite.sql.parser.SqlParserPos;
+import org.apache.calcite.util.Pair;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * A <code>SqlDialect</code> implementation for the Oracle database.
@@ -66,6 +76,34 @@ public class OracleSqlDialect extends SqlDialect {
         SqlCall call2 = SqlFloorFunction.replaceTimeUnitOperand(call, timeUnit.name(),
             timeUnitNode.getParserPosition());
         SqlFloorFunction.unparseDatetimeFunction(writer, call2, "TRUNC", true);
+        break;
+
+      case VALUES:
+        List<SqlSelect> list = new ArrayList<>();
+        for (SqlNode node : call.getOperandList()) {
+          final SqlCall row = (SqlCall) node;
+          final List<SqlNode> values = row.getOperandList();
+          final List<SqlNode> values2 = new ArrayList<>();
+          for (Pair<SqlNode, String> value
+              : Pair.zip(values, Arrays.asList("a", "b"))) {
+            values2.add(
+                SqlStdOperatorTable.AS.createCall(SqlParserPos.ZERO, value.left,
+                    new SqlIdentifier(value.right, SqlParserPos.ZERO)));
+          }
+          list.add(
+              new SqlSelect(SqlParserPos.ZERO, null,
+                  new SqlNodeList(values2, SqlParserPos.ZERO),
+                  new SqlIdentifier("DUAL", SqlParserPos.ZERO), null, null,
+                  null, null, null, null, null));
+        }
+        SqlNode node;
+        if (list.size() == 1) {
+          node = list.get(0);
+        } else {
+          node = SqlStdOperatorTable.UNION_ALL.createCall(
+              new SqlNodeList(list, SqlParserPos.ZERO));
+        }
+        node.unparse(writer, 0, 0);
         break;
 
       default:

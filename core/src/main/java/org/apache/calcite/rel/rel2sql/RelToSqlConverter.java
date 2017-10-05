@@ -275,6 +275,16 @@ public class RelToSqlConverter extends SqlImplementor
       selects.add(ANONYMOUS_ROW.createCall(exprList(context, tuple)));
     }
     SqlNode query = SqlStdOperatorTable.VALUES.createCall(selects);
+    if (true) {
+      final List<SqlNode> list = new ArrayList<>();
+      list.add(query);
+      list.add(new SqlIdentifier("t", SqlParserPos.ZERO));
+      for (String fieldName : e.getRowType().getFieldNames()) {
+        list.add(new SqlIdentifier(fieldName, SqlParserPos.ZERO));
+      }
+      query =
+          SqlStdOperatorTable.AS.createCall(query.getParserPosition(), list);
+    }
     return result(query, clauses, e, null);
   }
 
