@@ -790,7 +790,7 @@ public class RelToSqlConverterTest {
     sql("VALUES " + expression)
         .withHsqldb()
         .ok("SELECT *\n"
-            + "FROM (VALUES  (" + expected + "))");
+            + "FROM (VALUES  (" + expected + ")) AS t (EXPR$0)");
   }
 
   /** Test case for
@@ -2020,10 +2020,12 @@ public class RelToSqlConverterTest {
     final String expectedPostgresql = "SELECT \"a\"\n"
         + "FROM (VALUES  (1, 'x '),\n"
         + " (2, 'yy')) AS \"t\" (\"a\", \"b\")";
-    final String expectedOracle = "select \"A\" from (\n"
-        + "    select 1 as \"A\", 'x' as \"B\" from dual\n"
-        + "    union all\n"
-        + "    select 2 as \"A\", 'yy' as \"B\" from dual)";
+    final String expectedOracle = "SELECT \"a\"\n"
+        + "FROM (SELECT 1 \"a\", 'x ' \"b\"\n"
+        + "FROM \"DUAL\"\n"
+        + "UNION ALL\n"
+        + "SELECT 2 \"a\", 'yy' \"b\"\n"
+        + "FROM \"DUAL\")";
     sql(sql)
         .withHsqldb()
         .ok(expectedHsqldb)
