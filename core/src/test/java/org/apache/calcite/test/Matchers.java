@@ -16,8 +16,10 @@
  */
 package org.apache.calcite.test;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
+import org.hamcrest.BaseMatcher;
 import org.hamcrest.CustomTypeSafeMatcher;
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;
@@ -76,6 +78,25 @@ public class Matchers {
           THREAD_ACTUAL.set(actualList);
         }
         return equals;
+      }
+    };
+  }
+
+  /** Returns a {@link Matcher} that succeeds if the given {@link Number} is
+   * within {@code delta} of a given value. */
+  public static Matcher<Number> isApproximately(final double v,
+      final double delta) {
+    Preconditions.checkArgument(delta >= 0D);
+    return new BaseMatcher<Number>() {
+      public boolean matches(Object item) {
+        return item instanceof Number
+            && (((Number) item).doubleValue() == v
+                || (((Number) item).doubleValue() >= v - delta
+                    && ((Number) item).doubleValue() <= v + delta));
+      }
+
+      public void describeTo(Description description) {
+        description.appendText("within " + delta + " of " + v);
       }
     };
   }

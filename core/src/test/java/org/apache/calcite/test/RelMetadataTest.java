@@ -88,6 +88,7 @@ import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.calcite.util.ImmutableIntList;
+import org.apache.calcite.util.SaffronProperties;
 
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
@@ -100,6 +101,7 @@ import com.google.common.collect.Sets;
 import org.hamcrest.CoreMatchers;
 import org.hamcrest.CustomTypeSafeMatcher;
 import org.hamcrest.Matcher;
+import org.junit.Assume;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -117,6 +119,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import static org.apache.calcite.test.Matchers.isApproximately;
 import static org.hamcrest.CoreMatchers.endsWith;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.instanceOf;
@@ -778,6 +781,30 @@ public class RelMetadataTest extends SqlToRelTestBase {
     Double result = mq.getSelectivity(rel, null);
     assertThat(result,
         nearTo(DEFAULT_COMP_SELECTIVITY * DEFAULT_EQUAL_SELECTIVITY, EPSILON));
+  }
+
+  /** Test case for
+   * <a href="https://issues.apache.org/jira/browse/CALCITE-1808">[CALCITE-1808]
+   * JaninoRelMetadataProvider loading cache might cause
+   * OutOfMemoryError</a>. */
+  @Test public void testMetadataHandlerCacheLimit() {
+    Assume.assumeTrue("If cache size is too large, this test may fail and the "
+            + "test won't be to blame",
+        SaffronProperties.INSTANCE.metadataHandlerCacheMaximumSize().get()
+            < 10_000);
+    final int iterationCount = 2_000;
+    final RelNode rel = convertSql("select * from emp");
+    final RelMetadataProvider metadataProvider =
+        rel.getCluster().getMetadataProvider();
+    final RelOptPlanner planner = rel.getCluster().getPlanner();
+    for (int i = 0; i < iterationCount; i++) {
+      RelMetadataQuery.THREAD_PROVIDERS.set(
+          JaninoRelMetadataProvider.of(
+              new CachingRelMetadataProvider(metadataProvider, planner)));
+      final RelMetadataQuery mq = RelMetadataQuery.instance();
+      final Double result = mq.getRowCount(rel);
+      assertThat(result, isApproximately(14d, 0.1d));
+    }
   }
 
   @Test public void testDistinctRowCountTable() {
