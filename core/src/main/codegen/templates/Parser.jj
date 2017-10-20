@@ -704,7 +704,7 @@ SqlNode ParenthesizedExpression(ExprContext exprContext) :
  * <p>which should be illegal.  The above is interpreted as equivalent to
  *
  * <blockquote><pre>
- * <code>WHERE x IN ((select count(*) from t where c=d),5)</pre>
+ * WHERE x IN ((select count(*) from t where c=d),5)</pre>
  * </blockquote>
  *
  * <p>which is a legal use of a sub-query.  The only way to fix the hole is to
