@@ -34,6 +34,7 @@ import org.apache.calcite.rel.core.TableModify;
 import org.apache.calcite.rel.logical.LogicalTableModify;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelDataTypeImpl;
 import org.apache.calcite.rel.type.RelProtoDataType;
 import org.apache.calcite.rex.RexNode;
@@ -41,9 +42,12 @@ import org.apache.calcite.schema.ColumnStrategy;
 import org.apache.calcite.schema.ModifiableTable;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.Schemas;
+import org.apache.calcite.schema.TranslatableTable;
 import org.apache.calcite.schema.Wrapper;
 import org.apache.calcite.schema.impl.AbstractTable;
 import org.apache.calcite.schema.impl.AbstractTableQueryable;
+import org.apache.calcite.schema.impl.ViewTable;
+import org.apache.calcite.schema.impl.ViewTableMacro;
 import org.apache.calcite.sql.SqlCreate;
 import org.apache.calcite.sql.SqlExecutableStatement;
 import org.apache.calcite.sql.SqlIdentifier;
@@ -54,6 +58,7 @@ import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlSpecialOperator;
 import org.apache.calcite.sql.SqlUtil;
 import org.apache.calcite.sql.SqlWriter;
+import org.apache.calcite.sql.dialect.CalciteSqlDialect;
 import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql2rel.InitializerContext;
 import org.apache.calcite.sql2rel.InitializerExpressionFactory;
@@ -122,19 +127,66 @@ public class SqlCreateTable extends SqlCreate
     final Pair<CalciteSchema, String> pair =
         SqlDdlNodes.schema(context, true, name);
     final JavaTypeFactory typeFactory = new JavaTypeFactoryImpl();
+    final RelDataType queryRowType;
+    if (query != null) {
+      // A bit of a hack: pretend it's a view, to get its row type
+      final String sql = query.toSqlString(CalciteSqlDialect.DEFAULT).getSql();
+      final ViewTableMacro viewTableMacro =
+          ViewTable.viewMacro(pair.left.plus(), sql, pair.left.path(null),
+              context.getObjectPath(), false);
+      final TranslatableTable x = viewTableMacro.apply(ImmutableList.of());
+      queryRowType = x.getRowType(typeFactory);
+
+      if (columnList != null
+          && queryRowType.getFieldCount() != columnList.size()) {
+        throw SqlUtil.newContextException(columnList.getParserPosition(),
+              RESOURCE.columnCountMismatch());
+      }
+    } else {
+      queryRowType = null;
+    }
+    final List<SqlNode> columnList;
+    if (this.columnList != null) {
+      columnList = this.columnList.getList();
+    } else {
+      if (queryRowType == null) {
+        throw new RuntimeException("todo: real exception");
+      }
+      columnList = new ArrayList<>();
+      for (String name : queryRowType.getFieldNames()) {
+        columnList.add(new SqlIdentifier(name, SqlParserPos.ZERO));
+      }
+    }
+    final ImmutableList.Builder<ColumnDef> b = ImmutableList.builder();
     final RelDataTypeFactory.Builder builder = typeFactory.builder();
     final RelDataTypeFactory.Builder storedBuilder = typeFactory.builder();
-    final ImmutableList.Builder<ColumnDef> b = ImmutableList.builder();
     for (Ord<SqlNode> c : Ord.zip(columnList)) {
-      assert c.e instanceof SqlColumnDeclaration;
-      final SqlColumnDeclaration d = (SqlColumnDeclaration) c.e;
-      final RelDataType type = d.dataType.deriveType(typeFactory, true);
-      builder.add(d.name.getSimple(), type);
-      if (d.strategy != ColumnStrategy.VIRTUAL) {
-        storedBuilder.add(d.name.getSimple(), type);
+      if (c.e instanceof SqlColumnDeclaration) {
+        final SqlColumnDeclaration d = (SqlColumnDeclaration) c.e;
+        final RelDataType type = d.dataType.deriveType(typeFactory, true);
+        builder.add(d.name.getSimple(), type);
+        if (d.strategy != ColumnStrategy.VIRTUAL) {
+          storedBuilder.add(d.name.getSimple(), type);
+        }
+        b.add(ColumnDef.of(d.expression, type, d.strategy));
+      } else if (c.e instanceof SqlIdentifier) {
+        final SqlIdentifier id = (SqlIdentifier) c.e;
+        if (queryRowType == null) {
+          throw new AssertionError("TODO");
+        }
+        final RelDataTypeField f = queryRowType.getFieldList().get(c.i);
+        final ColumnStrategy strategy = f.getType().isNullable()
+            ? ColumnStrategy.NULLABLE
+            : ColumnStrategy.NOT_NULLABLE;
+        b.add(ColumnDef.of(c.e, f.getType(), strategy));
+        builder.add(id.getSimple(), f.getType());
+        storedBuilder.add(id.getSimple(), f.getType());
+      } else {
+        throw new AssertionError(c.e.getClass());
       }
-      b.add(ColumnDef.of(d.expression, type, d.strategy));
     }
+    final RelDataType rowType = builder.build();
+    final RelDataType storedRowType = storedBuilder.build();
     final List<ColumnDef> columns = b.build();
     final InitializerExpressionFactory ief =
         new NullInitializerExpressionFactory() {
@@ -156,11 +208,11 @@ public class SqlCreateTable extends SqlCreate
       // Table does not exist. Create it.
       pair.left.add(pair.right,
           new MutableArrayTable(pair.right,
-              RelDataTypeImpl.proto(storedBuilder.build()),
-              RelDataTypeImpl.proto(builder.build()), ief));
+              RelDataTypeImpl.proto(storedRowType),
+              RelDataTypeImpl.proto(rowType), ief));
     } else if (!ifNotExists) {
       // Table exists. They did not specify IF NOT EXISTS, so give error.
-      throw SqlUtil.newContextException(pos,
+      throw SqlUtil.newContextException(name.getParserPosition(),
           RESOURCE.tableExists(pair.right));
     }
   }

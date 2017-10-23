@@ -79,7 +79,7 @@ public class SqlDropView extends SqlDrop
     // Not quite right: removes any other functions with the same name
     final boolean existed = schema.removeFunction(name.getSimple());
     if (!existed && !ifExists) {
-      throw SqlUtil.newContextException(pos,
+      throw SqlUtil.newContextException(name.getParserPosition(),
           RESOURCE.viewNotFound(name.getSimple()));
     }
   }

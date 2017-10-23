@@ -123,7 +123,7 @@ public class SqlCreateForeignSchema extends SqlCreate
     final SchemaPlus subSchema0 = pair.left.plus().getSubSchema(pair.right);
     if (subSchema0 != null) {
       if (!getReplace() && !ifNotExists) {
-        throw SqlUtil.newContextException(pos,
+        throw SqlUtil.newContextException(name.getParserPosition(),
             RESOURCE.schemaExists(pair.right));
       }
     }
@@ -147,7 +147,7 @@ public class SqlCreateForeignSchema extends SqlCreate
         libraryName = null;
       }
       if (libraryName == null) {
-        throw SqlUtil.newContextException(pos,
+        throw SqlUtil.newContextException(this.type.getParserPosition(),
             RESOURCE.schemaInvalidType(typeName,
                 Arrays.toString(JsonSchema.Type.values())));
       }

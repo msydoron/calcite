@@ -80,7 +80,7 @@ public class SqlCreateSchema extends SqlCreate
     final SchemaPlus subSchema0 = pair.left.plus().getSubSchema(pair.right);
     if (subSchema0 != null) {
       if (!getReplace() && !ifNotExists) {
-        throw SqlUtil.newContextException(pos,
+        throw SqlUtil.newContextException(name.getParserPosition(),
             RESOURCE.schemaExists(pair.right));
       }
     }

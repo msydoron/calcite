@@ -108,7 +108,7 @@ public class SqlCreateView extends SqlCreate
     for (Function function : schemaPlus.getFunctions(pair.right)) {
       if (function.getParameters().isEmpty()) {
         if (!getReplace()) {
-          throw SqlUtil.newContextException(pos,
+          throw SqlUtil.newContextException(name.getParserPosition(),
               RESOURCE.viewExists(pair.right));
         }
         pair.left.removeFunction(pair.right);

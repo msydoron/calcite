@@ -72,7 +72,7 @@ public class SqlDropTable extends SqlDrop
     }
     final boolean existed = schema.removeTable(name.getSimple());
     if (!existed && !ifExists) {
-      throw SqlUtil.newContextException(pos,
+      throw SqlUtil.newContextException(name.getParserPosition(),
           RESOURCE.tableNotFound(name.getSimple()));
     }
   }
