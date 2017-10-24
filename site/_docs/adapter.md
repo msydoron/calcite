@@ -141,6 +141,11 @@ Note how each key in the `operand` section appears with a `schema.` prefix in th
 
 There are many other APIs that allow you to extend Calcite's capabilities.
 
+In this section, we briefly describe those APIs, to give you an idea what is
+possible. To fully use these APIs you will need to read other documentation
+such as the javadoc for the interfaces, and possibly seek out the tests that
+we have written for them.
+
 ### Functions and operators
 
 There are several ways to add operators or functions to Calcite.
