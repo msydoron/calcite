@@ -508,6 +508,19 @@ abstract class CalciteConnectionImpl
           rootSchema);
     }
 
+    public RelRunner getRelRunner() {
+      final RelRunner runner;
+      try {
+        runner = connection.unwrap(RelRunner.class);
+      } catch (SQLException e) {
+        throw new RuntimeException(e);
+      }
+      if (runner == null) {
+        throw new UnsupportedOperationException();
+      }
+      return runner;
+    }
+
     public CalcitePrepare.SparkHandler spark() {
       final boolean enable = config().spark();
       return CalcitePrepare.Dummy.getSparkHandler(enable);

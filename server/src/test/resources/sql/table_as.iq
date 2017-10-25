@@ -39,11 +39,13 @@ select * from dept where deptno > 10;
 
 # Check contents
 select * from d;
-+--------+------+
-| DEPTNO | NAME |
-+--------+------+
-+--------+------+
-(0 rows)
++--------+-------------+
+| DEPTNO | NAME        |
++--------+-------------+
+|     20 | Marketing   |
+|     30 | Engineering |
++--------+-------------+
+(2 rows)
 
 !ok
 
@@ -62,11 +64,13 @@ select * from dept where deptno < 30;
 
 # Check contents are unchanged
 select * from d;
-+--------+------+
-| DEPTNO | NAME |
-+--------+------+
-+--------+------+
-(0 rows)
++--------+-------------+
+| DEPTNO | NAME        |
++--------+-------------+
+|     20 | Marketing   |
+|     30 | Engineering |
++--------+-------------+
+(2 rows)
 
 !ok
 
@@ -87,6 +91,21 @@ drop table if exists d;
 
 !update
 
+# Create table without either AS or column list - fails
+create table d;
+At line 1, column 14: Missing column list
+!error
+
+# Create table without AS or column types - fails
+create table d (x, y);
+At line 1, column 17: Type required for column 'X' in CREATE TABLE without AS
+!error
+
+# Create table without AS or column types - fails
+create table d (x int, y);
+At line 1, column 24: Type required for column 'Y' in CREATE TABLE without AS
+!error
+
 # Create based on itself - fails
 create table d2 as select * from d2;
 Object 'D2' not found
@@ -106,6 +125,8 @@ select * from d3;
 +----+
 | DD |
 +----+
+| 10 |
+| 30 |
 +----+
 (2 rows)
 
@@ -132,6 +153,8 @@ select * from d4;
 +----+
 | DD |
 +----+
+| 10 |
+| 30 |
 +----+
 (2 rows)
 
@@ -152,6 +175,8 @@ select * from d5;
 +--------+--------+
 | EXPR$0 | EXPR$1 |
 +--------+--------+
+|      1 | a      |
+|      2 | b      |
 +--------+--------+
 (2 rows)
 
@@ -166,11 +191,12 @@ select * from dept where deptno < 15;
 
 # Check contents
 select * from d6;
-+---+---+
-| X | Y |
-+---+---+
-+---+---+
-(1 rows)
++----+-------+
+| X  | Y     |
++----+-------+
+| 10 | Sales |
++----+-------+
+(1 row)
 
 !ok
 
@@ -183,11 +209,12 @@ select * from dept where deptno < 15;
 
 # Check contents
 select * from d7;
-+---+---+
-| X | Y |
-+---+---+
-+---+---+
-(1 rows)
++----+-------+
+| X  | Y     |
++----+-------+
+| 10 | Sales |
++----+-------+
+(1 row)
 
 !ok
 
@@ -212,11 +239,12 @@ select * from dept where deptno < 15;
 
 # Check contents
 select * from d10;
-+---+---+
-| X | Y |
-+---+---+
-+---+---+
-(1 rows)
++----+-------+
+| X  | Y     |
++----+-------+
+| 10 | Sales |
++----+-------+
+(1 row)
 
 !ok
 

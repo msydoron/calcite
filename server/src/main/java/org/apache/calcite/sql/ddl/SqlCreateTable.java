@@ -30,6 +30,7 @@ import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.prepare.Prepare;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.core.TableModify;
 import org.apache.calcite.rel.logical.LogicalTableModify;
 import org.apache.calcite.rel.type.RelDataType;
@@ -59,17 +60,29 @@ import org.apache.calcite.sql.SqlSpecialOperator;
 import org.apache.calcite.sql.SqlUtil;
 import org.apache.calcite.sql.SqlWriter;
 import org.apache.calcite.sql.dialect.CalciteSqlDialect;
+import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParserPos;
+import org.apache.calcite.sql.pretty.SqlPrettyWriter;
 import org.apache.calcite.sql2rel.InitializerContext;
 import org.apache.calcite.sql2rel.InitializerExpressionFactory;
 import org.apache.calcite.sql2rel.NullInitializerExpressionFactory;
+import org.apache.calcite.tools.FrameworkConfig;
+import org.apache.calcite.tools.Frameworks;
+import org.apache.calcite.tools.Planner;
+import org.apache.calcite.tools.RelConversionException;
+import org.apache.calcite.tools.ValidationException;
 import org.apache.calcite.util.ImmutableNullableList;
 import org.apache.calcite.util.Pair;
+import org.apache.calcite.util.Util;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.lang.reflect.Type;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -140,7 +153,7 @@ public class SqlCreateTable extends SqlCreate
       if (columnList != null
           && queryRowType.getFieldCount() != columnList.size()) {
         throw SqlUtil.newContextException(columnList.getParserPosition(),
-              RESOURCE.columnCountMismatch());
+            RESOURCE.columnCountMismatch());
       }
     } else {
       queryRowType = null;
@@ -150,7 +163,10 @@ public class SqlCreateTable extends SqlCreate
       columnList = this.columnList.getList();
     } else {
       if (queryRowType == null) {
-        throw new RuntimeException("todo: real exception");
+        // "CREATE TABLE t" is invalid; because there is no "AS query" we need
+        // a list of column names and types, "CREATE TABLE t (INT c)".
+        throw SqlUtil.newContextException(name.getParserPosition(),
+            RESOURCE.createTableRequiresColumnList());
       }
       columnList = new ArrayList<>();
       for (String name : queryRowType.getFieldNames()) {
@@ -172,7 +188,8 @@ public class SqlCreateTable extends SqlCreate
       } else if (c.e instanceof SqlIdentifier) {
         final SqlIdentifier id = (SqlIdentifier) c.e;
         if (queryRowType == null) {
-          throw new AssertionError("TODO");
+          throw SqlUtil.newContextException(id.getParserPosition(),
+              RESOURCE.createTableRequiresColumnTypes(id.getSimple()));
         }
         final RelDataTypeField f = queryRowType.getFieldList().get(c.i);
         final ColumnStrategy strategy = f.getType().isNullable()
@@ -204,16 +221,50 @@ public class SqlCreateTable extends SqlCreate
             return super.newColumnDefaultValue(table, iColumn, context);
           }
         };
-    if (pair.left.plus().getTable(pair.right) == null) {
-      // Table does not exist. Create it.
-      pair.left.add(pair.right,
-          new MutableArrayTable(pair.right,
-              RelDataTypeImpl.proto(storedRowType),
-              RelDataTypeImpl.proto(rowType), ief));
-    } else if (!ifNotExists) {
-      // Table exists. They did not specify IF NOT EXISTS, so give error.
-      throw SqlUtil.newContextException(name.getParserPosition(),
-          RESOURCE.tableExists(pair.right));
+    if (pair.left.plus().getTable(pair.right) != null) {
+      // Table exists.
+      if (!ifNotExists) {
+        // They did not specify IF NOT EXISTS, so give error.
+        throw SqlUtil.newContextException(name.getParserPosition(),
+            RESOURCE.tableExists(pair.right));
+      }
+      return;
+    }
+    // Table does not exist. Create it.
+    pair.left.add(pair.right,
+        new MutableArrayTable(pair.right,
+            RelDataTypeImpl.proto(storedRowType),
+            RelDataTypeImpl.proto(rowType), ief));
+    if (query != null) {
+      // Generate, prepare and execute an "INSERT INTO table query" statement.
+      // (It's a bit inefficient that we convert from SqlNode to SQL and back
+      // again.)
+      final FrameworkConfig config = Frameworks.newConfigBuilder()
+          .defaultSchema(context.getRootSchema().plus())
+          .build();
+      final Planner planner = Frameworks.getPlanner(config);
+      try {
+        final StringWriter sw = new StringWriter();
+        final PrintWriter pw = new PrintWriter(sw);
+        final SqlPrettyWriter w =
+            new SqlPrettyWriter(CalciteSqlDialect.DEFAULT, false, pw);
+        pw.print("INSERT INTO ");
+        name.unparse(w, 0, 0);
+        pw.print(" ");
+        query.unparse(w, 0, 0);
+        pw.flush();
+        final String sql = sw.toString();
+        final SqlNode query1 = planner.parse(sql);
+        final SqlNode query2 = planner.validate(query1);
+        final RelRoot r = planner.rel(query2);
+        final PreparedStatement prepare = context.getRelRunner().prepare(r.rel);
+        int rowCount = prepare.executeUpdate();
+        Util.discard(rowCount);
+        prepare.close();
+      } catch (SqlParseException | ValidationException
+          | RelConversionException | SQLException e) {
+        throw new RuntimeException(e);
+      }
     }
   }
 

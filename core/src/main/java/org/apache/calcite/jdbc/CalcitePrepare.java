@@ -43,6 +43,7 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.validate.CyclicDefinitionException;
 import org.apache.calcite.sql.validate.SqlValidator;
+import org.apache.calcite.tools.RelRunner;
 import org.apache.calcite.util.ImmutableIntList;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -133,6 +134,9 @@ public interface CalcitePrepare {
      * being analyzed further up the stack, the view definition can be deduced
      * to be cyclic. */
     List<String> getObjectPath();
+
+    /** Gets a runner; it can execute a relational expression. */
+    RelRunner getRelRunner();
   }
 
   /** Callback to register Spark as the main engine. */
