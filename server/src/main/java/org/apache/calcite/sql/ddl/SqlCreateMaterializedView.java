@@ -18,8 +18,9 @@ package org.apache.calcite.sql.ddl;
 
 import org.apache.calcite.jdbc.CalcitePrepare;
 import org.apache.calcite.jdbc.CalciteSchema;
-import org.apache.calcite.schema.Function;
-import org.apache.calcite.schema.SchemaPlus;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeImpl;
+import org.apache.calcite.schema.Schema;
 import org.apache.calcite.schema.TranslatableTable;
 import org.apache.calcite.schema.impl.ViewTable;
 import org.apache.calcite.schema.impl.ViewTableMacro;
@@ -35,9 +36,9 @@ import org.apache.calcite.sql.SqlUtil;
 import org.apache.calcite.sql.SqlWriter;
 import org.apache.calcite.sql.dialect.CalciteSqlDialect;
 import org.apache.calcite.sql.parser.SqlParserPos;
+import org.apache.calcite.sql2rel.NullInitializerExpressionFactory;
 import org.apache.calcite.util.ImmutableNullableList;
 import org.apache.calcite.util.Pair;
-import org.apache.calcite.util.Util;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -47,21 +48,23 @@ import java.util.List;
 import static org.apache.calcite.util.Static.RESOURCE;
 
 /**
- * Parse tree for {@code CREATE VIEW} statement.
+ * Parse tree for {@code CREATE MATERIALIZED VIEW} statement.
  */
-public class SqlCreateView extends SqlCreate
+public class SqlCreateMaterializedView extends SqlCreate
     implements SqlExecutableStatement {
   private final SqlIdentifier name;
   private final SqlNodeList columnList;
   private final SqlNode query;
 
   private static final SqlOperator OPERATOR =
-      new SqlSpecialOperator("CREATE VIEW", SqlKind.CREATE_VIEW);
+      new SqlSpecialOperator("CREATE MATERIALIZED VIEW",
+          SqlKind.CREATE_MATERIALIZED_VIEW);
 
   /** Creates a SqlCreateView. */
-  SqlCreateView(SqlParserPos pos, boolean replace, SqlIdentifier name,
-      SqlNodeList columnList, SqlNode query) {
-    super(OPERATOR, pos, replace, false);
+  SqlCreateMaterializedView(SqlParserPos pos, boolean replace,
+      boolean ifNotExists, SqlIdentifier name, SqlNodeList columnList,
+      SqlNode query) {
+    super(OPERATOR, pos, replace, ifNotExists);
     this.name = Preconditions.checkNotNull(name);
     this.columnList = columnList; // may be null
     this.query = Preconditions.checkNotNull(query);
@@ -72,12 +75,11 @@ public class SqlCreateView extends SqlCreate
   }
 
   @Override public void unparse(SqlWriter writer, int leftPrec, int rightPrec) {
-    if (getReplace()) {
-      writer.keyword("CREATE OR REPLACE");
-    } else {
-      writer.keyword("CREATE");
+    writer.keyword("CREATE");
+    writer.keyword("MATERIALIZED VIEW");
+    if (ifNotExists) {
+      writer.keyword("IF NOT EXISTS");
     }
-    writer.keyword("VIEW");
     name.unparse(writer, leftPrec, rightPrec);
     if (columnList != null) {
       SqlWriter.Frame frame = writer.startList("(", ")");
@@ -95,26 +97,34 @@ public class SqlCreateView extends SqlCreate
   public void execute(CalcitePrepare.Context context) {
     final Pair<CalciteSchema, String> pair =
         SqlDdlNodes.schema(context, true, name);
-    final SchemaPlus schemaPlus = pair.left.plus();
-    for (Function function : schemaPlus.getFunctions(pair.right)) {
-      if (function.getParameters().isEmpty()) {
-        if (!getReplace()) {
-          throw SqlUtil.newContextException(name.getParserPosition(),
-              RESOURCE.viewExists(pair.right));
-        }
-        pair.left.removeFunction(pair.right);
+    if (pair.left.plus().getTable(pair.right) != null) {
+      // Materialized view exists.
+      if (!ifNotExists) {
+        // They did not specify IF NOT EXISTS, so give error.
+        throw SqlUtil.newContextException(name.getParserPosition(),
+            RESOURCE.tableExists(pair.right));
       }
+      return;
     }
     final SqlNode q = SqlDdlNodes.renameColumns(columnList, query);
     final String sql = q.toSqlString(CalciteSqlDialect.DEFAULT).getSql();
     final ViewTableMacro viewTableMacro =
-        ViewTable.viewMacro(schemaPlus, sql, pair.left.path(null),
+        ViewTable.viewMacro(pair.left.plus(), sql, pair.left.path(null),
             context.getObjectPath(), false);
     final TranslatableTable x = viewTableMacro.apply(ImmutableList.of());
-    Util.discard(x);
-    schemaPlus.add(pair.right, viewTableMacro);
-  }
+    final RelDataType rowType = x.getRowType(context.getTypeFactory());
 
+    // Table does not exist. Create it.
+    pair.left.add(pair.right,
+        new SqlCreateTable.MutableArrayTable(pair.right,
+            RelDataTypeImpl.proto(rowType), RelDataTypeImpl.proto(rowType),
+            NullInitializerExpressionFactory.INSTANCE) {
+          @Override public Schema.TableType getJdbcTableType() {
+            return Schema.TableType.MATERIALIZED_VIEW;
+          }
+        });
+    SqlDdlNodes.populate(name, query, context);
+  }
 }
 
-// End SqlCreateView.java
+// End SqlCreateMaterializedView.java

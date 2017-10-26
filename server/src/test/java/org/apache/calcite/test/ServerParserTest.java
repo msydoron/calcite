@@ -36,10 +36,11 @@ import org.junit.Test;
  * should generate check constraint on b;
  * should populate b in insert as if it had a default
  *
- * <li>test that "create table as select" works
- *
  * <li>"create table as select" should store constraints
  * deduced by planner
+ *
+ * <li>during CREATE VIEW, check for a table and a materialized view
+ * with the same name (they have the same namespace)
  *
  * </ul>
  */
@@ -160,15 +161,37 @@ public class ServerParserTest extends SqlParserTest {
   }
 
   @Test public void testCreateMaterializedView() {
-    final String sql = "create or replace materialized view mv (d, v) as\n"
+    final String sql = "create materialized view mv (d, v) as\n"
         + "select deptno, count(*) from emp\n"
         + "group by deptno order by deptno desc";
-    final String expected = "CREATE OR REPLACE"
-        + " MATERIALIZED VIEW `MV` (`D`, `V`) AS\n"
+    final String expected = "CREATE MATERIALIZED VIEW `MV` (`D`, `V`) AS\n"
         + "SELECT `DEPTNO`, COUNT(*)\n"
         + "FROM `EMP`\n"
         + "GROUP BY `DEPTNO`\n"
         + "ORDER BY `DEPTNO` DESC";
+    sql(sql).ok(expected);
+  }
+
+  @Test public void testCreateMaterializedView2() {
+    final String sql = "create materialized view if not exists mv as\n"
+        + "select deptno, count(*) from emp\n"
+        + "group by deptno order by deptno desc";
+    final String expected = "CREATE MATERIALIZED VIEW IF NOT EXISTS `MV` AS\n"
+        + "SELECT `DEPTNO`, COUNT(*)\n"
+        + "FROM `EMP`\n"
+        + "GROUP BY `DEPTNO`\n"
+        + "ORDER BY `DEPTNO` DESC";
+    sql(sql).ok(expected);
+  }
+
+  // "OR REPLACE" is allowed by the parser, but the validator will give an
+  // error later
+  @Test public void testCreateOrReplaceMaterializedView() {
+    final String sql = "create or replace materialized view mv as\n"
+        + "select * from emp";
+    final String expected = "CREATE MATERIALIZED VIEW `MV` AS\n"
+        + "SELECT *\n"
+        + "FROM `EMP`";
     sql(sql).ok(expected);
   }
 

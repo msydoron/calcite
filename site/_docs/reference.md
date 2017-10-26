@@ -2033,7 +2033,7 @@ measureColumn:
       expression AS alias
 
 pattern:
-      patternTerm ['|' patternTerm ]*
+      patternTerm [ '|' patternTerm ]*
 
 patternTerm:
       patternFactor [ patternFactor ]*
@@ -2070,8 +2070,9 @@ and *minRepeat* and *maxRepeat* are non-negative integers.
 
 DDL extensions are only available in the calcite-server module.
 To enable, include `calcite-server.jar` in your class path, and add
-`ParserFactory=org.apache.calcite.sql.parser.ddl.SqlDdlParserImpl#FACTORY`
-to the JDBC connect string.
+`parserFactory=org.apache.calcite.sql.parser.ddl.SqlDdlParserImpl#FACTORY`
+to the JDBC connect string (see connect string property
+[parserFactory]({{ site.apiRoot }}/org/apache/calcite/config/CalciteConnectionProperty.html#PARSER_FACTORY)).
 
 {% highlight sql %}
 ddlStatement:
@@ -2079,9 +2080,12 @@ ddlStatement:
   |   createForeignSchemaStatement
   |   createTableStatement
   |   createViewStatement
+  |   createMaterializedViewStatement
   |   dropSchemaStatement
+  |   dropForeignSchemaStatement
   |   dropTableStatement
   |   dropViewStatement
+  |   dropMaterializedViewStatement
 
 createSchemaStatement:
       CREATE [ OR REPLACE ] SCHEMA [ IF NOT EXISTS ] name
@@ -2103,7 +2107,7 @@ createTableStatement:
       [ AS query ]
 
 tableElement:
-      column type [ columnGenerator ] [ columnConstraint ]
+      columnName type [ columnGenerator ] [ columnConstraint ]
   |   columnName
   |   tableConstraint
 
@@ -2120,27 +2124,39 @@ tableConstraint:
       [ CONSTRAINT name ]
       {
           CHECK '(' expression ')'
-      |   PRIMARY KEY '(' column [, column ]* ')'
-      |   UNIQUE '(' column [, column ]* ')'
+      |   PRIMARY KEY '(' columnName [, columnName ]* ')'
+      |   UNIQUE '(' columnName [, columnName ]* ')'
       }
 
 createViewStatement:
-      CREATE [ OR REPLACE ] [ MATERIALIZED ] VIEW name
-      [ '(' column [, column ]* ')' ]
+      CREATE [ OR REPLACE ] VIEW name
+      [ '(' columnName [, columnName ]* ')' ]
+      AS query
+
+createMaterializedViewStatement:
+      CREATE MATERIALIZED VIEW [ IF NOT EXISTS ] name
+      [ '(' columnName [, columnName ]* ')' ]
       AS query
 
 dropSchemaStatement:
       DROP SCHEMA name [ IF EXISTS ]
 
+dropForeignSchemaStatement:
+      DROP FOREIGN SCHEMA name [ IF EXISTS ]
+
 dropTableStatement:
       DROP TABLE name [ IF EXISTS ]
 
 dropViewStatement:
-      DROP [ MATERIALIZED ] VIEW name [ IF EXISTS ]
+      DROP VIEW name [ IF EXISTS ]
+
+dropMaterializedViewStatement:
+      DROP MATERIALIZED VIEW name [ IF EXISTS ]
 {% endhighlight %}
 
 In *createTableStatement*, if you specify *AS query*, you may omit the list of
-columns, or you may specify column names without data types.
+*tableElement*s, or you can omit the data type of any *tableElement*, in which
+case it just renames the underlying column.
 
 In *columnGenerator*, if you do not specify `VIRTUAL` or `STORED` for a
 generated column, `VIRTUAL` is the default.

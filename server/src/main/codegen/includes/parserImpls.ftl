@@ -210,18 +210,33 @@ SqlCreate SqlCreateTable(Span s, boolean replace) :
 
 SqlCreate SqlCreateView(Span s, boolean replace) :
 {
-    boolean materialized = false;
     final SqlIdentifier id;
     SqlNodeList columnList = null;
     final SqlNode query;
 }
 {
-    [ <MATERIALIZED>  { materialized = true; } ]
     <VIEW> id = CompoundIdentifier()
     [ columnList = ParenthesizedSimpleIdentifierList() ]
     <AS> query = OrderedQueryOrExpr(ExprContext.ACCEPT_QUERY) {
-        return SqlDdlNodes.createView(s.end(this), replace, materialized, id,
-            columnList, query);
+        return SqlDdlNodes.createView(s.end(this), replace, id, columnList,
+            query);
+    }
+}
+
+SqlCreate SqlCreateMaterializedView(Span s, boolean replace) :
+{
+    final boolean ifNotExists;
+    final SqlIdentifier id;
+    SqlNodeList columnList = null;
+    final SqlNode query;
+}
+{
+    <MATERIALIZED> <VIEW> ifNotExists = IfNotExistsOpt()
+    id = CompoundIdentifier()
+    [ columnList = ParenthesizedSimpleIdentifierList() ]
+    <AS> query = OrderedQueryOrExpr(ExprContext.ACCEPT_QUERY) {
+        return SqlDdlNodes.createMaterializedView(s.end(this), replace,
+            ifNotExists, id, columnList, query);
     }
 }
 
@@ -256,13 +271,22 @@ SqlDrop SqlDropTable(Span s, boolean replace) :
 SqlDrop SqlDropView(Span s, boolean replace) :
 {
     final boolean ifExists;
-    boolean materialized = false;
     final SqlIdentifier id;
 }
 {
-    [ <MATERIALIZED>  { materialized = true; } ]
     <VIEW> ifExists = IfExistsOpt() id = CompoundIdentifier() {
-        return SqlDdlNodes.dropView(s.end(this), materialized, ifExists, id);
+        return SqlDdlNodes.dropView(s.end(this), ifExists, id);
+    }
+}
+
+SqlDrop SqlDropMaterializedView(Span s, boolean replace) :
+{
+    final boolean ifExists;
+    final SqlIdentifier id;
+}
+{
+    <MATERIALIZED> <VIEW> ifExists = IfExistsOpt() id = CompoundIdentifier() {
+        return SqlDdlNodes.dropMaterializedView(s.end(this), ifExists, id);
     }
 }
 

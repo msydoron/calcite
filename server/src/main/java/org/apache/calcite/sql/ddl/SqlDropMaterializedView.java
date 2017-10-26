@@ -23,16 +23,18 @@ import org.apache.calcite.sql.SqlSpecialOperator;
 import org.apache.calcite.sql.parser.SqlParserPos;
 
 /**
- * Parse tree for {@code DROP VIEW} statement.
+ * Parse tree for {@code DROP MATERIALIZED VIEW} statement.
  */
-public class SqlDropView extends SqlDropObject {
+public class SqlDropMaterializedView extends SqlDropObject {
   private static final SqlOperator OPERATOR =
-      new SqlSpecialOperator("DROP VIEW", SqlKind.DROP_VIEW);
+      new SqlSpecialOperator("DROP MATERIALIZED VIEW",
+          SqlKind.DROP_MATERIALIZED_VIEW);
 
-  /** Creates a SqlDropView. */
-  SqlDropView(SqlParserPos pos, boolean ifExists, SqlIdentifier name) {
+  /** Creates a SqlDropMaterializedView. */
+  SqlDropMaterializedView(SqlParserPos pos, boolean ifExists,
+      SqlIdentifier name) {
     super(OPERATOR, pos, ifExists, name);
   }
 }
 
-// End SqlDropView.java
+// End SqlDropMaterializedView.java
