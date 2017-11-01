@@ -92,15 +92,15 @@ as implemented by Avatica's
 | <a href="{{ site.apiRoot }}/org/apache/calcite/config/CalciteConnectionProperty.html#LEX">lex</a> | Lexical policy. Values are ORACLE (default), MYSQL, MYSQL_ANSI, SQL_SERVER, JAVA.
 | <a href="{{ site.apiRoot }}/org/apache/calcite/config/CalciteConnectionProperty.html#MATERIALIZATIONS_ENABLED">materializationsEnabled</a> | Whether Calcite should use materializations. Default false.
 | <a href="{{ site.apiRoot }}/org/apache/calcite/config/CalciteConnectionProperty.html#MODEL">model</a> | URI of the JSON model file.
-| <a href="{{ site.apiRoot }}/org/apache/calcite/config/CalciteConnectionProperty.html#PARSER_FACTORY">parserFactory</a> | Parser factory. The name of a class that implements <a href="{{ site.apiRoot }}/org/apache/calcite/sql/parser/SqlParserImplFactory.html">SqlParserImplFactory</a> and has a public default constructor or an `INSTANCE` constant.
+| <a href="{{ site.apiRoot }}/org/apache/calcite/config/CalciteConnectionProperty.html#PARSER_FACTORY">parserFactory</a> | Parser factory. The name of a class that implements [`interface SqlParserImplFactory`]({{ site.apiRoot }}/org/apache/calcite/sql/parser/SqlParserImplFactory.html) and has a public default constructor or an `INSTANCE` constant.
 | <a href="{{ site.apiRoot }}/org/apache/calcite/config/CalciteConnectionProperty.html#QUOTING">quoting</a> | How identifiers are quoted. Values are DOUBLE_QUOTE, BACK_QUOTE, BRACKET. If not specified, value from `lex` is used.
 | <a href="{{ site.apiRoot }}/org/apache/calcite/config/CalciteConnectionProperty.html#QUOTED_CASING">quotedCasing</a> | How identifiers are stored if they are quoted. Values are UNCHANGED, TO_UPPER, TO_LOWER. If not specified, value from `lex` is used.
 | <a href="{{ site.apiRoot }}/org/apache/calcite/config/CalciteConnectionProperty.html#SCHEMA">schema</a> | Name of initial schema.
-| <a href="{{ site.apiRoot }}/org/apache/calcite/config/CalciteConnectionProperty.html#SCHEMA_FACTORY">schemaFactory</a> | Schema factory. The name of a class that implements <a href="{{ site.apiRoot }}/org/apache/calcite/schema/SchemaFactory.html">SchemaFactory</a> and has a public default constructor or an `INSTANCE` constant. Ignored if `model` is specified.
+| <a href="{{ site.apiRoot }}/org/apache/calcite/config/CalciteConnectionProperty.html#SCHEMA_FACTORY">schemaFactory</a> | Schema factory. The name of a class that implements [`interface SchemaFactory`]({{ site.apiRoot }}/org/apache/calcite/schema/SchemaFactory.html) and has a public default constructor or an `INSTANCE` constant. Ignored if `model` is specified.
 | <a href="{{ site.apiRoot }}/org/apache/calcite/config/CalciteConnectionProperty.html#SCHEMA_TYPE">schemaType</a> | Schema type. Value must be "MAP" (the default), "JDBC", or "CUSTOM" (implicit if `schemaFactory` is specified). Ignored if `model` is specified.
 | <a href="{{ site.apiRoot }}/org/apache/calcite/config/CalciteConnectionProperty.html#SPARK">spark</a> | Specifies whether Spark should be used as the engine for processing that cannot be pushed to the source system. If false (the default), Calcite generates code that implements the Enumerable interface.
 | <a href="{{ site.apiRoot }}/org/apache/calcite/config/CalciteConnectionProperty.html#TIME_ZONE">timeZone</a> | Time zone, for example "gmt-3". Default is the JVM's time zone.
-| <a href="{{ site.apiRoot }}/org/apache/calcite/config/CalciteConnectionProperty.html#TYPE_SYSTEM">typeSystem</a> | Type system. The name of a class that implements <a href="{{ site.apiRoot }}/org/apache/calcite/rel/type/RelDataTypeSystem.html">RelDataTypeSystem</a> and has a public default constructor or an `INSTANCE` constant.
+| <a href="{{ site.apiRoot }}/org/apache/calcite/config/CalciteConnectionProperty.html#TYPE_SYSTEM">typeSystem</a> | Type system. The name of a class that implements [`interface RelDataTypeSystem`]({{ site.apiRoot }}/org/apache/calcite/rel/type/RelDataTypeSystem.html) and has a public default constructor or an `INSTANCE` constant.
 | <a href="{{ site.apiRoot }}/org/apache/calcite/config/CalciteConnectionProperty.html#UNQUOTED_CASING">unquotedCasing</a> | How identifiers are stored if they are not quoted. Values are UNCHANGED, TO_UPPER, TO_LOWER. If not specified, value from `lex` is used.
 
 To make a connection to a single schema based on a built-in schema type, you don't need to specify
@@ -158,7 +158,7 @@ arguments, resolving overloaded functions, or deriving the return type.
 
 It you want that flexibility, you probably need to write you a
 *user-defined operator*
-(see [interface SqlOperator]({{ site.apiRoot }}/org/apache/calcite/sql/SqlOperator.html)).
+(see [`interface SqlOperator`]({{ site.apiRoot }}/org/apache/calcite/sql/SqlOperator.html)).
 
 If your operator does not adhere to standard SQL function syntax,
 "`f(arg1, arg2, ...)`", then you need to
@@ -168,7 +168,41 @@ If your operator does not adhere to standard SQL function syntax,
 
 *User-defined aggregate functions* are similar to user-defined functions,
 but each function has several corresponding Java methods, one for each
-stage in the life-cycle of an aggregate: `init`, `add`, `merge`, `result`.
+stage in the life-cycle of an aggregate:
+
+* `init` creates an accumulator;
+* `add` adds one row's value to an accumulator;
+* `merge` combines two accumulators into one;
+* `result` finalizes an accumulator and converts it to a result.
+
+For `SUM(int)` the methods (in pseudocode) are as follows:
+
+{% highlight java %}
+struct Accumulator {
+  final int sum;
+}
+Accumulator init() {
+  return new Accumulator(0);
+}
+Accumulator add(Accumulator a, int x) {
+  return new Accumulator(a.sum + x);
+}
+Accumulator merge(Accumulator a, Accumulator a2) {
+  return new Accumulator(a.sum + a2.sum);
+}
+int result(Accumulator a) {
+  return new Accumulator(a.sum + x);
+}
+{% endhighlight %}
+
+Here is the sequence of calls to compute the sum of two rows with column values 4 and 7:
+
+{% highlight java %}
+a = init()    # a = {0}
+a = add(a, 4) # a = {4}
+a = add(a, 7) # a = {11}
+return result(a) # returns 11
+{% endhighlight %}
 
 ### Window functions
 
@@ -185,7 +219,26 @@ appear in more than one window. For example, 10:37 appears in both the
 
 Window functions are computed incrementally: when the clock ticks from
 10:14 to 10:15, two rows might enter the window and three rows leave.
-For this, window functions have have an extra life-cycle operation, `remove`.
+For this, window functions have have an extra life-cycle operation:
+
+* `remove` removes a value from an accumulator.
+
+Here is the sequence of calls to compute the moving sum,
+over the previous 2 rows, of 4 rows with values 4, 7, 2 and 3:
+
+{% highlight java %}
+a = init()        # a = {0}
+a = add(a, 4)    # a = {4}
+emit result(a)   # emits 4
+a = add(a, 7)    # a = {11}
+emit result(a)   # emits 11
+a = remove(a, 4) # a = {7}
+a = add(a, 2)    # a = {9}
+emit result(a)   # emits 9
+a = remove(a, 7) # a = {2}
+a = add(a, 3)    # a = {5}
+emit result(a)   # emits 5
+{% endhighlight %}
 
 ### Grouped window functions
 
@@ -193,7 +246,7 @@ Grouped window functions are functions that operate the `GROUP BY` clause
 to gather together records into sets. The built-in grouped window functions
 are `HOP`, `TUMBLE` and `SESSION`.
 You can define additional functions by implementing
-[interface SqlGroupedWindowFunction]({{ site.apiRoot }}/org/apache/calcite/sql/fun/SqlGroupedWindowFunction.html).
+[`interface SqlGroupedWindowFunction`]({{ site.apiRoot }}/org/apache/calcite/sql/fun/SqlGroupedWindowFunction.html).
 
 ### Table functions and table macros
 
@@ -234,21 +287,21 @@ adds DDL statements such as `CREATE TABLE, is an example that you could follow.
 ### Defining a custom schema
 
 To define a custom schema, you need to implement
-[interface SchemaFactory]({{ site.apiRoot }}/org/apache/calcite/schema/SchemaFactory.html).
+[`interface SchemaFactory`]({{ site.apiRoot }}/org/apache/calcite/schema/SchemaFactory.html).
 
 During query preparation, Calcite will call this interface to find out
 what tables and sub-schemas your schema contains. When a table in your schema
 is referenced in a query, Calcite will ask your schema to create an instance of
-[interface Table]({{ site.apiRoot }}/org/apache/calcite/schema/Table.html).
+[`interface Table`]({{ site.apiRoot }}/org/apache/calcite/schema/Table.html).
 
 That table will be wrapped in a
-[TableScan]({{ site.apiRoot }}/org/apache/calcite/rel/core/TableScan.html)
+[`TableScan`]({{ site.apiRoot }}/org/apache/calcite/rel/core/TableScan.html)
 and will undergo the query optimization process.
 
 ### Defining a custom table
 
 To define a custom table, you need to implement
-[interface TableFactory]({{ site.apiRoot }}/org/apache/calcite/schema/TableFactory.html).
+[`interface TableFactory`]({{ site.apiRoot }}/org/apache/calcite/schema/TableFactory.html).
 Whereas a schema factory a set of named tables, a table factory produces a
 single table when bound to a schema with a particular name (and optionally a
 set of extra operands).
@@ -257,21 +310,21 @@ set of extra operands).
 
 If your table is to support DML operations (INSERT, UPDATE, DELETE, MERGE),
 your implementation of `interface Table` must implement
-[interface ModifiableTable]({{ site.apiRoot }}/org/apache/calcite/schema/ModifiableTable.html).
+[`interface ModifiableTable`]({{ site.apiRoot }}/org/apache/calcite/schema/ModifiableTable.html).
 
 ### Streaming
 
 If your table is to support streaming queries,
 your implementation of `interface Table` must implement
-[interface StreamableTable]({{ site.apiRoot }}/org/apache/calcite/schema/StreamableTable.html).
+[`interface StreamableTable`]({{ site.apiRoot }}/org/apache/calcite/schema/StreamableTable.html).
 
 ### Pushing operations down to your table
 
 If you wish to push processing down to your custom table's source system,
 consider implementing either
-[interface FilterableTable]({{ site.apiRoot }}/org/apache/calcite/schema/FilterableTable.html)
+[`interface FilterableTable`]({{ site.apiRoot }}/org/apache/calcite/schema/FilterableTable.html)
 or
-[interface ProjectableFilterableTable]({{ site.apiRoot }}/org/apache/calcite/schema/ProjectableFilterableTable.html).
+[`interface ProjectableFilterableTable`]({{ site.apiRoot }}/org/apache/calcite/schema/ProjectableFilterableTable.html).
 
 If you want more control, you should write a [planner rule](#planner-rule).
 This will allow you to push down expressions, to make a cost-based decision
@@ -281,31 +334,31 @@ such as join, aggregation, and sort.
 ### Relational operators
 
 All relational operators implement
-[interface RelNode]({{ site.apiRoot }}/org/apache/calcite/rel/RelNode.html)
+[`interface RelNode`]({{ site.apiRoot }}/org/apache/calcite/rel/RelNode.html)
 and most extend
-[class AbstractRelNode]({{ site.apiRoot }}/org/apache/calcite/rel/AbstractRelNode.html).
+[`class AbstractRelNode`]({{ site.apiRoot }}/org/apache/calcite/rel/AbstractRelNode.html).
 The core operators (used by
-[SqlToRelConverter]({{ site.apiRoot }}/org/apache/calcite/sql2rel/SqlToRelConverter.html)
+[`SqlToRelConverter`]({{ site.apiRoot }}/org/apache/calcite/sql2rel/SqlToRelConverter.html)
 and covering conventional relational algebra) are
-[TableScan]({{ site.apiRoot }}/org/apache/calcite/rel/core/TableScan.html),
-[TableModify]({{ site.apiRoot }}/org/apache/calcite/rel/core/TableModify.html),
-[Values]({{ site.apiRoot }}/org/apache/calcite/rel/core/Values.html),
-[Project]({{ site.apiRoot }}/org/apache/calcite/rel/core/Project.html),
-[Filter]({{ site.apiRoot }}/org/apache/calcite/rel/core/Filter.html),
-[Aggregate]({{ site.apiRoot }}/org/apache/calcite/rel/core/Aggregate.html),
-[Join]({{ site.apiRoot }}/org/apache/calcite/rel/core/Join.html),
-[Sort]({{ site.apiRoot }}/org/apache/calcite/rel/core/Sort.html), 
-[Union]({{ site.apiRoot }}/org/apache/calcite/rel/core/Union.html),
-[Intersect]({{ site.apiRoot }}/org/apache/calcite/rel/core/Intersect.html),
-[Minus]({{ site.apiRoot }}/org/apache/calcite/rel/core/Minus.html),
-[Window]({{ site.apiRoot }}/org/apache/calcite/rel/core/Window.html) and
-[Match]({{ site.apiRoot }}/org/apache/calcite/rel/core/Match.html).
+[`TableScan`]({{ site.apiRoot }}/org/apache/calcite/rel/core/TableScan.html),
+[`TableModify`]({{ site.apiRoot }}/org/apache/calcite/rel/core/TableModify.html),
+[`Values`]({{ site.apiRoot }}/org/apache/calcite/rel/core/Values.html),
+[`Project`]({{ site.apiRoot }}/org/apache/calcite/rel/core/Project.html),
+[`Filter`]({{ site.apiRoot }}/org/apache/calcite/rel/core/Filter.html),
+[`Aggregate`]({{ site.apiRoot }}/org/apache/calcite/rel/core/Aggregate.html),
+[`Join`]({{ site.apiRoot }}/org/apache/calcite/rel/core/Join.html),
+[`Sort`]({{ site.apiRoot }}/org/apache/calcite/rel/core/Sort.html), 
+[`Union`]({{ site.apiRoot }}/org/apache/calcite/rel/core/Union.html),
+[`Intersect`]({{ site.apiRoot }}/org/apache/calcite/rel/core/Intersect.html),
+[`Minus`]({{ site.apiRoot }}/org/apache/calcite/rel/core/Minus.html),
+[`Window`]({{ site.apiRoot }}/org/apache/calcite/rel/core/Window.html) and
+[`Match`]({{ site.apiRoot }}/org/apache/calcite/rel/core/Match.html).
 
 Each of these has a "pure" logical sub-class, 
-[LogicalProject]({{ site.apiRoot }}/org/apache/calcite/rel/logical/LogicalProject.html)
+[`LogicalProject`]({{ site.apiRoot }}/org/apache/calcite/rel/logical/LogicalProject.html)
 and so forth. Any given adapter will have counterparts for the operations that
 its engine can implement efficiently; for example, the Cassandra adapter has
-[CassandraProject]({{ site.apiRoot }}/org/apache/calcite/rel/cassandra/CassandraProject.html)
+[`CassandraProject`]({{ site.apiRoot }}/org/apache/calcite/rel/cassandra/CassandraProject.html)
 but there is no `CassandraJoin`.
 
 You can define your own sub-class of `RelNode` to add a new operator, or
@@ -337,9 +390,9 @@ firing rules in a sequence that produces an optimal plan, but each individual
 rules only concerns itself with correctness.
 
 Calcite has two built-in planner engines:
-[class VolcanoPlanner]({{ site.apiRoot }}/org/apache/calcite/plan/volcano/VolcanoPlanner.html)
+[`class VolcanoPlanner`]({{ site.apiRoot }}/org/apache/calcite/plan/volcano/VolcanoPlanner.html)
 uses dynamic programming and is good for exhaustive search, whereas
-[class HepPlanner]({{ site.apiRoot }}/org/apache/calcite/plan/hep/HepPlanner.html)
+[`class HepPlanner`]({{ site.apiRoot }}/org/apache/calcite/plan/hep/HepPlanner.html)
 fires a sequence of rules in a more fixed order.
 
 ### Calling conventions
@@ -352,7 +405,7 @@ to another.
 
 If data needs to be converted from one calling convention to another, Calcite
 uses a special sub-class of relational expression called a converter
-(see [class Converter]({{ site.apiRoot }}/org/apache/calcite/rel/convert/Converter.html)).
+(see [`class Converter`]({{ site.apiRoot }}/org/apache/calcite/rel/convert/Converter.html)).
 But of course converting data has a runtime cost.
 
 When planning a query that uses multiple engines, Calcite "colors" regions of
@@ -363,15 +416,15 @@ operation can occur in more than one place, and ultimately the best plan is
 chosen according to cost.
 
 A calling convention is a class that implements
-[interface Convention]({{ site.apiRoot }}/org/apache/calcite/plan/Convention.html),
+[`interface Convention`]({{ site.apiRoot }}/org/apache/calcite/plan/Convention.html),
 an auxiliary interface (for instance
-[interface CassandraRel]({{ site.apiRoot }}/org/apache/calcite/adapter/cassandra/CassandraRel.html)),
+[`interface CassandraRel`]({{ site.apiRoot }}/org/apache/calcite/adapter/cassandra/CassandraRel.html)),
 and a set of sub-classes of
-[class RelNode]({{ site.apiRoot }}/org/apache/calcite/rel/RelNode.html)
+[`class RelNode`]({{ site.apiRoot }}/org/apache/calcite/rel/RelNode.html)
 that implement that interface for the core relational operators
-([Project]({{ site.apiRoot }}/org/apache/calcite/rel/core/Project.html),
-[Filter]({{ site.apiRoot }}/org/apache/calcite/rel/core/Filter.html),
-[Aggregate]({{ site.apiRoot }}/org/apache/calcite/rel/core/Aggregate.html), and
+([`Project`]({{ site.apiRoot }}/org/apache/calcite/rel/core/Project.html),
+[`Filter`]({{ site.apiRoot }}/org/apache/calcite/rel/core/Filter.html),
+[`Aggregate`]({{ site.apiRoot }}/org/apache/calcite/rel/core/Aggregate.html), and
 so forth.
 
 ### Built-in SQL implementation
@@ -380,7 +433,7 @@ How does Calcite implement SQL, if an adapter does not implement all of the core
 relational operators?
 
 The answer is a particular built-in calling convention,
-[EnumerableConvention]({{ site.apiRoot }}/org/apache/calcite/adapter/EnumerableConvention.html).
+[`EnumerableConvention`]({{ site.apiRoot }}/org/apache/calcite/adapter/EnumerableConvention.html).
 Relational expressions of enumerable convention are implemented as "built-ins":
 Calcite generates Java code, compiles it, and executes inside its own JVM.
 Enumerable convention is less efficient than, say, a distributed engine
@@ -395,9 +448,9 @@ Calcite has a metadata system that allow you to define cost functions and
 statistics about relational operators, collectively referred to as *metadata*.
 Each kind of metadata has an interface with (usually) one method.
 For example, selectivity is defined by
-[interface RelMdSelectivity]({{ site.apiRoot }}/org/apache/calcite/rel/metadata/RelMdSelectivity.html)
+[`interface RelMdSelectivity`]({{ site.apiRoot }}/org/apache/calcite/rel/metadata/RelMdSelectivity.html)
 and the method
-[getSelectivity]({{ site.apiRoot }}/org/apache/calcite/rel/metadata/RelMetadataQuery.html#getSelectivity-org.apache.calcite.rel.RelNode-org.apache.calcite.rex.RexNode-).
+[`getSelectivity`]({{ site.apiRoot }}/org/apache/calcite/rel/metadata/RelMetadataQuery.html#getSelectivity-org.apache.calcite.rel.RelNode-org.apache.calcite.rex.RexNode-).
 
 There are many built-in kinds of metadata, including
 [collation]({{ site.apiRoot }}/org/apache/calcite/rel/metadata/RelMdCollation.html),
