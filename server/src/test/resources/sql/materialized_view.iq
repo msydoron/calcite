@@ -1,4 +1,4 @@
-# table_as.iq - "CREATE TABLE AS ..." DDL
+# materialized_view.iq - Materialized view DDL
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -254,5 +254,9 @@ select * from "metadata".TABLES;
 (3 rows)
 
 !ok
+
+# Check that exact match materialized view is used
+select * from dept where deptno < 15;
+!plan
 
 # End materialized_view.iq

@@ -16,13 +16,15 @@
  */
 package org.apache.calcite.test;
 
+import org.apache.calcite.materialize.MaterializationService;
+
 import net.hydromatic.quidem.Quidem;
 
+import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.util.Collection;
 
 /**
@@ -49,6 +51,11 @@ public class ServerQuidemTest extends QuidemTest {
     }
   }
 
+  @Override @Test public void test() throws Exception {
+    MaterializationService.setThreadLocal();
+    super.test();
+  }
+
   /** For {@link Parameterized} runner. */
   @Parameterized.Parameters(name = "{index}: quidem({0})")
   public static Collection<Object[]> data() {
@@ -64,7 +71,7 @@ public class ServerQuidemTest extends QuidemTest {
           throws Exception {
         switch (name) {
         case "server":
-          return DriverManager.getConnection(ServerTest.URL);
+          return ServerTest.connect();
         }
         return super.connect(name, reference);
       }

@@ -16,6 +16,7 @@
  */
 package org.apache.calcite.test;
 
+import org.apache.calcite.config.CalciteConnectionProperty;
 import org.apache.calcite.sql.parser.ddl.SqlDdlParserImpl;
 
 import org.junit.Ignore;
@@ -38,11 +39,20 @@ import static org.junit.Assert.fail;
  */
 public class ServerTest {
 
-  static final String URL = "jdbc:calcite:"
-      + "ParserFactory=" + SqlDdlParserImpl.class.getName() + "#FACTORY";
+  static final String URL = "jdbc:calcite:";
+
+  static Connection connect() throws SQLException {
+    return DriverManager.getConnection(URL,
+        CalciteAssert.propBuilder()
+            .set(CalciteConnectionProperty.PARSER_FACTORY,
+                SqlDdlParserImpl.class.getName() + "#FACTORY")
+            .set(CalciteConnectionProperty.MATERIALIZATIONS_ENABLED,
+                "true")
+            .build());
+  }
 
   @Test public void testStatement() throws Exception {
-    try (Connection c = DriverManager.getConnection(URL);
+    try (Connection c = connect();
          Statement s = c.createStatement();
          ResultSet r = s.executeQuery("values 1, 2")) {
       assertThat(r.next(), is(true));
@@ -53,7 +63,7 @@ public class ServerTest {
   }
 
   @Test public void testCreateSchema() throws Exception {
-    try (Connection c = DriverManager.getConnection(URL);
+    try (Connection c = connect();
          Statement s = c.createStatement()) {
       boolean b = s.execute("create schema s");
       assertThat(b, is(true));
@@ -70,7 +80,7 @@ public class ServerTest {
   }
 
   @Test public void testCreateTable() throws Exception {
-    try (Connection c = DriverManager.getConnection(URL);
+    try (Connection c = connect();
          Statement s = c.createStatement()) {
       boolean b = s.execute("create table t (i int not null)");
       assertThat(b, is(true));
@@ -87,7 +97,7 @@ public class ServerTest {
   }
 
   @Test public void testStoredGeneratedColumn() throws Exception {
-    try (Connection c = DriverManager.getConnection(URL);
+    try (Connection c = connect();
          Statement s = c.createStatement()) {
       boolean b = s.execute("create table t (\n"
           + " h int not null,\n"
@@ -204,7 +214,7 @@ public class ServerTest {
 
   @Ignore("not working yet")
   @Test public void testStoredGeneratedColumn2() throws Exception {
-    try (Connection c = DriverManager.getConnection(URL);
+    try (Connection c = connect();
          Statement s = c.createStatement()) {
       boolean b = s.execute("create table t (\n"
           + " h int not null,\n"
@@ -225,7 +235,7 @@ public class ServerTest {
   }
 
   @Test public void testVirtualColumn() throws Exception {
-    try (Connection c = DriverManager.getConnection(URL);
+    try (Connection c = connect();
          Statement s = c.createStatement()) {
       boolean b = s.execute("create table t (\n"
           + " h int not null,\n"

@@ -18,6 +18,8 @@ package org.apache.calcite.sql.ddl;
 
 import org.apache.calcite.jdbc.CalcitePrepare;
 import org.apache.calcite.jdbc.CalciteSchema;
+import org.apache.calcite.materialize.MaterializationKey;
+import org.apache.calcite.materialize.MaterializationService;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeImpl;
 import org.apache.calcite.schema.Schema;
@@ -39,6 +41,7 @@ import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql2rel.NullInitializerExpressionFactory;
 import org.apache.calcite.util.ImmutableNullableList;
 import org.apache.calcite.util.Pair;
+import org.apache.calcite.util.Util;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -108,8 +111,9 @@ public class SqlCreateMaterializedView extends SqlCreate
     }
     final SqlNode q = SqlDdlNodes.renameColumns(columnList, query);
     final String sql = q.toSqlString(CalciteSqlDialect.DEFAULT).getSql();
+    final List<String> schemaPath = pair.left.path(null);
     final ViewTableMacro viewTableMacro =
-        ViewTable.viewMacro(pair.left.plus(), sql, pair.left.path(null),
+        ViewTable.viewMacro(pair.left.plus(), sql, schemaPath,
             context.getObjectPath(), false);
     final TranslatableTable x = viewTableMacro.apply(ImmutableList.of());
     final RelDataType rowType = x.getRowType(context.getTypeFactory());
@@ -124,6 +128,10 @@ public class SqlCreateMaterializedView extends SqlCreate
           }
         });
     SqlDdlNodes.populate(name, query, context);
+    final MaterializationKey materializationKey =
+        MaterializationService.instance().defineMaterialization(pair.left,
+            null, sql, schemaPath, pair.right, true, true);
+    Util.discard(materializationKey);
   }
 }
 
